@@ -1,0 +1,925 @@
+<?php
+
+/**
+ * @file
+ *   Drush support for entities.
+ */
+/**
+ * Define how a print out needs to be
+ */
+define('DRUSH_ENTITY_SEPARATED_SPACE', 'space-separated');
+
+/**
+ * Implementation of hook_drush_command().
+ */
+function entity_drush_command() {
+  // Some standard settings
+  $output_json = "Process the entity as JSON";
+  $output_format = "Define output format. Known formats are: json, print_r, properties, export";
+  $type = "Entity type";
+  $nids = "A list of space-separated entity IDs to print to stdout.";
+
+  $items = array();
+
+  /*
+   * Entity type commands
+   */
+  $items['entity-type-read'] = array(
+    'description' => "List details of entity types",
+    'arguments' => array(
+      'type' => "Entity type to list. If omitted all types are listed.",
+    ),
+    'options' => array(
+      'format' => $output_format,
+      'fields' => 'fields of type to list specific info.',
+      'exclude-fields' => 'exclude fields from the list',
+      'include-fieldapi' => 'include the bundle specific field definitions',
+    ),
+    'examples' => array(
+      'entity-type-read' => 'List available entity types',
+      'entity-type-read node' => 'List node type information',
+      'entity-type-read node --fields=bundles' => 'List bundles for node type',
+      "etr `drush etr` --fields='entity keys',fieldable" => 'List all entity keys and fieldable.',
+      'entity-type-read node --fields=bundles/*/admin/path' => 'List admin path for all bundles',
+    ),
+    'aliases' => array('etr'),
+  );
+
+  /*
+   * Entity commands
+   */
+  $items['entity-create'] = array(
+    'description' => "Create an entity from a json object",
+    'arguments' => array(
+      'type' => "Entity type",
+    ),
+    'options' => array(
+      'json' => $output_json,
+    ),
+    'examples' => array(
+      'entity-read node 4 --json | drush entity-create node' => 'Copy node/4 to a new entity.',
+    ),
+    'aliases' => array('ec'),
+  );
+
+  $items['entity-read'] = array(
+    'description' => "Print entity contents",
+    'arguments' => array(
+      'type' => $type,
+      'nids' => $nids,
+    ),
+    'options' => array(
+      'format' => $output_format,
+      'fields' => 'fields of type to list specific info',
+    ),
+    'examples' => array(
+      'entity-read user 4' => 'Print the user object 4',
+      'entity-read taxonomy_vocabulary 1' => 'Print the taxonomy_vocabulary object 1',
+    ),
+    'aliases' => array('er'),
+  );
+
+  $items['entity-update'] = array(
+    'description' => "Update an entity as json in the default editor",
+    'arguments' => array(
+      'type' => $type,
+      'nids' => $nids,
+    ),
+    'options' => array(
+      'json' => $output_json,
+      'fields' => 'fields of type to list specific info',
+      'json-input' => 'Filename with json content, or - for STDIN'
+    ),
+    'examples' => array(
+      'entity-update node 4' => 'Update node 4 as json in the default editor',
+    ),
+    'aliases' => array('eu'),
+  );
+
+  $items['entity-delete'] = array(
+    'description' => 'Delete entities.',
+    'arguments' => array(
+      'type' => $type,
+      'nids' => $nids,
+    ),
+    'options' => array(
+      'json' => $output_json,
+    ),
+    'examples' => array(
+      'entity-delete' => '.',
+      'entity-delete node 64' => '.',
+      'entity-delete node --type=story' => '.',
+    ),
+    'aliases' => array('ed'),
+  );
+
+  return $items;
+}
+
+/**
+ * Implementation of hook_drush_help().
+ *
+ * @param
+ *   A string with the help section (prepend with 'drush:')
+ *
+ * @return
+ *   A string with the help text for your command.
+ */
+function entity_drush_help($section) {
+  // TODO: is this function still needed?
+  switch ($section) {
+    case 'drush:entity-show':
+      return dt("Print entity objects to stdout");
+    case 'drush:entity-create':
+      return dt("Create an entity from a json object");
+    case 'drush:entity-edit':
+      return dt("Edit an entity as json in the default editor");
+    case 'drush:entity-delete':
+      return dt('Delete entities.');
+  }
+}
+
+/**
+ * List details of entity types
+ *
+ * @param type $type
+ * @return type
+ */
+function drush_entity_type_read($entity_type = NULL) {
+  $types = func_get_args();
+  $entities_info = _drush_entity_get_info();
+
+  // List the available types
+  if (empty($entity_type)) {
+    $result = array_keys($entities_info);
+    drush_print(drush_format($result));
+    return;
+  }
+
+  $fields = _drush_entity_get_fields();
+  $result = array();
+  if (count($types)) {
+    foreach ($types as $type) {
+      $info = $entities_info[$type];
+      $result_type = _drush_entity_filter_fields($info, $fields, _drush_entity_get_exclude_fields());
+      if (!empty($result_type)) {
+        $result[$type] = $result_type;
+      }
+    }
+  }
+
+  drush_print(drush_format($result));
+  return;
+}
+
+/**
+ * Filter on the given paths
+ *
+ * Each path may contain forward slashes / to filter subtrees
+ *
+ * A path may contain a star * or ** to wildcard a path
+ *
+ * Example paths (ignore space after *)
+ * - schema_fields_sql
+ * - bundles/* /label
+ * - ** /display
+ *
+ * @param array $value
+ * @param array $paths
+ *   List of paths to filter about.
+ * @return array
+ *   The matching path
+ */
+function _drush_entity_filter_fields(array $value, array $paths, array $delete_path = array()) {
+  // Store object hashs to prevent object ref recursion
+  $object_hash_list = array();
+  $return = array();
+  if (empty($paths)) {
+    $return = $value;
+  }
+  // List of path already done
+  $visited = array();
+  while (count($paths) > 0) {
+    $path = array_shift($paths);
+    if (isset($visited[$path])) {
+      continue;
+    }
+    $visited[$path] = $path;
+    // Contains the resulting path
+    $head = array();
+    // The result is a linked list done with an key => array construct
+    $tail = &$head;  // By ref
+    $sub_tree = split('/', $path);
+    $current_path = '';
+    $work_value = $value;
+    $failed_path = FALSE;
+    while (count($sub_tree) > 0) {
+      $p = array_shift($sub_tree);
+      if ($p == '*' || $p == '**') {
+        // Wildcards only usefull on arrays
+        if (is_array($work_value) || _drush_entity_visit_object(&$object_hash_list, $work_value)) {
+          // Say a/**/b was requested
+          // We need to search for a/b and a/$option/**/b
+          $new_tree = $sub_tree;
+          $new_path = $current_path . join('/', $new_tree);
+          if (!isset($visited[$new_path])) {
+            array_push($paths, $new_path);
+          }
+          // We cast to array only to generate paths
+          $p_options = array_keys((array)$work_value);
+          //$p = array_shift($p_options);
+          foreach ($p_options as $p_option) {
+            // Create
+            $new_tree = $sub_tree;
+            array_unshift($new_tree, $p_option);
+            $new_path = $current_path . join('/', $new_tree);
+            if (!isset($visited[$new_path])) {
+              array_push($paths, $new_path);
+              if ($p == '**') {
+                $new_tree = $sub_tree;
+                array_unshift($new_tree, '**');
+                array_unshift($new_tree, $p_option);
+                $new_path = $current_path . join('/', $new_tree);
+                if (!isset($visited[$new_path])) {
+                  array_push($paths, $new_path);
+                }
+              }
+            }
+          }
+        }
+        else {
+          $failed_path = TRUE;
+        }
+        // We processed the wildcard paths so stop processing
+        break; // sub tree processing
+      }
+      // Remember current path
+      $current_path .= $p . '/';
+      // Consume key
+      $temp = (array) $work_value;
+      if (is_array($temp) && isset($temp[$p])) {
+        $work_value = $temp[$p];
+        if (is_object($work_value) || is_array($work_value)) {
+          if (count($sub_tree)) {
+            // We are not done yet
+            $tail[$p] = array();
+          }
+          else {
+            // Stuff value: object or array
+            $tail[$p] = $work_value;
+          }
+        }
+        else {
+          $tail[$p] = $work_value;
+        }
+        // Follow the build tree
+        $tail = &$tail[$p]; // By ref
+      }
+      else {
+        $failed_path = TRUE;
+        break; // while
+      }
+    }
+    if (!$failed_path && count($sub_tree) == 0) {
+      $return = array_merge_recursive($return, $head);
+    }
+  }
+  if ($delete_path) {
+    $delete = _drush_entity_filter_fields($return, $delete_path);
+    // TODO substract $delete from $return .. next command deletes more
+    // try etr --include-fieldapi ... the are deleted too
+    // $return = array_diff($return, $delete);
+  }
+  return $return;
+}
+
+/**
+ * List the entity IDs of the given type
+ *
+ * @param type $entity_type
+ */
+function _drush_entity_read_list($entity_type) {
+  $entity_info = _drush_entity_get_info($entity_type);
+
+  if (drush_drupal_major_version() < 7) {
+    if (isset($entity_info['load list sql'])) {
+      $sql = $entity_info['load list sql'];
+      $entities = array();
+      $result = db_query($sql);
+      while ($row = db_fetch_array($result)) {
+        $id = $row['id'];
+        $entities[$entity_type][$id] = $id;
+      }
+    }
+  }
+  else {
+    $query = new EntityFieldQuery();
+    $entities = $query->entityCondition('entity_type', $entity_type)->execute();
+  }
+
+  if (count($entities)) {
+    $result = array_keys($entities[$entity_type]);
+    $format = DRUSH_ENTITY_SEPARATED_SPACE;
+    $header = "Available ids for $entity_type";
+  }
+  else {
+    $format = DRUSH_ENTITY_SEPARATED_SPACE;
+    $header = "No ids for $entity_type";
+    $result = array();
+  }
+  _drush_entity_print($result, $format, $header);
+}
+
+/**
+ * Show entities by given type and id
+ *
+ * @param string $type
+ *   Given entity type
+ */
+function drush_entity_read($entity_type = NULL) {
+  if (!isset($entity_type)) {
+    drush_die("You must specify an entity_type");
+  }
+  $ids = func_get_args();
+  $entity_type = array_shift($ids);
+  _drush_entity_check_type($entity_type);
+
+  // Do listing
+  if (count($ids) == 0) {
+    _drush_entity_read_list($entity_type);
+    return;
+  }
+
+  // Do content
+  $entities = _drush_entity_load($entity_type, $ids);
+
+  $fields = _drush_entity_get_fields();
+  if ($fields) {
+    $entities = _drush_entity_select_fields($entities, $fields, TRUE);
+  }
+
+  if (drush_get_option('json', FALSE) && count($entities) == 1) {
+    // We only shift when requesting json and just one entity
+    $entities = array_shift($entities);
+  }
+
+  drush_print_pipe(drush_format($entities));
+  drush_print(drush_format($entities));
+}
+
+/**
+ * Extract the selected fields from a number of entities.
+ *
+ * @param type $entities Array of entities
+ * @param type $fields Array of fileds to be returned for each entity
+ * @return type
+ */
+function _drush_entity_select_fields($entities, $fields, $allow_path = FALSE) {
+  if (!$allow_path) {
+    foreach ($fields as $path) {
+      if (strpos($path, '/') !== FALSE) {
+        drush_die("No path supported yet : $path");
+      }
+      if (strpos($path, '*') !== FALSE) {
+        drush_die("No wildcard supported yet : $path");
+      }
+    }
+  }
+
+  $result = array();
+  foreach ($entities as $eid => $entity) {
+    $result[$eid] = _drush_entity_filter_fields((array) $entity, $fields);
+  }
+  return $result;
+}
+
+/**
+ * Create an entity by the given type.
+ *
+ * @param $entity_type
+ * @param $arg
+ */
+function drush_entity_create($entity_type, $arg = NULL) {
+  if (!isset($entity_type)) {
+    drush_die("You must specify a entity_type");
+  }
+
+//  if (!drush_get_option('json')) {
+//    drush_die("You must specify --json");
+//  }
+
+  _drush_entity_check_type($entity_type);
+
+  $entity_info = _drush_entity_get_info($entity_type);
+
+  if (empty($arg)) {
+    $entity = new stdClass();
+    if (isset($entity_info['drush']['defaults'])) {
+      foreach ($entity_info['drush']['defaults'] as $key => $value) {
+        $entity->$key = $value;
+      }
+    }
+    $entity_json = _drush_entity_edit_string(drush_json_encode($entity));
+  }
+  else if ($arg === '-' || file_exists($arg)) {
+    if ($arg === '-') {
+      $entity_json = stream_get_contents(STDIN);
+    }
+    else {
+      drush_log("Reading file $arg");
+      $entity_json = file_get_contents($arg);
+    }
+  }
+  else {
+    drush_die("Improper input/args");
+  }
+
+  if (!empty($entity_json)) {
+    $entity = (object) drush_json_decode($entity_json);
+
+    $eid = $entity_info['drush']['new'][0];
+    if (_drush_entity_save($entity_type, $entity, TRUE)) {
+      _drush_entity_print('', DRUSH_ENTITY_SEPARATED_SPACE, 'Entity created.');
+    }
+    else if (isset($entity->$eid)) {
+      _drush_entity_print(array($entity->$eid), DRUSH_ENTITY_SEPARATED_SPACE, 'Entity created.');
+    }
+    else {
+      drush_set_error('DRUSH_ERROR', dt("Failed to create entity!"));
+    }
+  }
+  else if ($arg === '-') {
+    drush_set_error('DRUSH_NO_STDIN', dt("stdin empty!"));
+  }
+  else {
+    drush_set_error('DRUSH_EMPTY_FILE', dt("Empty file!"));
+  }
+}
+
+/**
+ * Edit a string with the default shell editor.
+ *
+ * @param type $string
+ * @return type
+ */
+function _drush_entity_edit_string($string) {
+  $editor = getenv('EDITOR');
+  if (empty($editor)) {
+    drush_set_error('DRUSH_NO_EDITOR', dt('The environment variable EDITOR is not set'));
+    return $string;
+  }
+  else {
+    $file = drush_save_data_to_temp_file($string);
+    drush_shell_exec_interactive('$EDITOR ' . $file);
+    return file_get_contents($file, "r");
+  }
+}
+
+/**
+ * Convert the given fields into an array
+ *
+ * @return Array
+ */
+function _drush_entity_get_fields() {
+  $fields = drush_get_option('fields', '');
+  if ($fields) {
+    return split(',', $fields);
+  }
+  return array();
+}
+
+function _drush_entity_get_exclude_fields() {
+  $fields = drush_get_option('exclude-fields', '');
+  // We always include 'drush' to exclude fields
+  if (!$fields) {
+    $fields = 'drush';
+  }
+  else {
+    $fields .= ',drush';
+  }
+  $exclude_fields = split(',', $fields);
+  return array_diff($exclude_fields, _drush_entity_get_fields());
+}
+
+/**
+ * Update given entity.
+ */
+function drush_entity_update($entity_type, $id) {
+  $fields = _drush_entity_get_fields();
+  $entities = _drush_entity_load($entity_type, array($id));
+
+  if (isset($entities[$id])) {
+    $entity = $entities[$id];
+    $input = drush_get_option('json-input', NULL);
+    if ($input === '-') {
+      $edited_obj_json = stream_get_contents(STDIN);
+    }
+    elseif (file_exists($input)) {
+      drush_log("Reading file $input");
+      $edited_obj_json = file_get_contents($input);
+    }
+    else {
+      // Prepare to EDIT a json string
+      if ($fields) {
+        $entities_fields = _drush_entity_select_fields($entities, $fields, FALSE);
+      }
+
+      if ($fields) {
+        $edit_obj = $entities_fields[$id];
+      }
+      else {
+        $edit_obj = $entity;
+      }
+      $edited_obj_json = _drush_entity_edit_string(drush_json_encode($edit_obj));
+    }
+
+    // Prepare the changed entity to be saved
+    if ($fields) {
+      // Remap fields onto entity
+      $edited_entity = $entity;
+      $edited_fields = (object) drush_json_decode($edited_obj_json);
+      foreach ($fields as $field) {
+        $edited_entity->$field = $edited_fields->$field;
+      }
+    }
+    else {
+      $edited_entity = (object) drush_json_decode($edited_obj_json);
+    }
+
+    // Save
+    _drush_entity_save($entity_type, $edited_entity);
+  }
+  else {
+    drush_set_error('DRUSH_ERROR', dt("Entity to update not found!"));
+  }
+}
+
+/**
+ * Load entities with the given type and IDs
+ *
+ * @param type $entity_type
+ * @param type $ids
+ * @return array with entity objects
+ */
+function _drush_entity_load($entity_type, $ids) {
+  $entities = array();
+  switch (drush_drupal_major_version()) {
+    case 5:
+    case 6:
+      foreach ($ids as $id) {
+        $entity = _drush_entity_op('load', $entity_type, $id);
+        $entities[$id] = (object) $entity;
+      }
+      break;
+    case 7:
+      $entities = entity_load($entity_type, $ids);
+      break;
+  }
+  return $entities;
+}
+
+/**
+ * Command callback.
+ */
+function drush_entity_delete($entity_type, $ids = NULL) {
+  if (!isset($entity_type)) {
+    drush_die("You must specify an entity type");
+  }
+  $info = _drush_entity_get_info($entity_type);
+  if (!isset($info)) {
+    drush_die("Type '$entity_type' does not exist.");
+  }
+  $ids = func_get_args();
+  $entity_type = array_shift($ids);
+
+  if (!is_null($ids)) {
+    $result = _drush_entity_delete($entity_type, $ids);
+    if (count($result) > 0) {
+      _drush_entity_print($result);
+    }
+  }
+  else {
+    drush_log("NOT YET IMPLEMENTED ... Delete ALL entities of type $entity_type", "ERROR");
+    //$nids = drush_get_nodes_by_type($entity_type);
+    //_drush_entity_delete($entity_type, $nids);
+  }
+}
+
+/**
+ * Save the given entity as a given type.
+ *
+ *
+ * @param $entity_type
+ *   The type of the entity.
+ * @param $entity
+ *   The entity to save.
+ * @return
+ *   Depending on implementation and drupal version
+ *
+ * @see entity_type_supports()
+ */
+function _drush_entity_save($entity_type, &$entity, $new = FALSE) {
+  if ($new) {
+    $entity_info = _drush_entity_get_info($entity_type);
+    if (isset($entity_info['drush']['new'])) {
+      foreach ($entity_info['drush']['new'] as $field) {
+        unset($entity->$field);
+      }
+    }
+  }
+
+  return _drush_entity_op('save', $entity_type, $entity);
+}
+
+/**
+ * Try running CRUD op on the given id or entity.
+ *
+ * This mimics from D7 Entity API entity.module but for all CRUD ops
+ *
+ * @param type $op
+ *   Operation to perform. Supported ops are: save, delete, load
+ * @param type $entity_type
+ * @param type $entity_or_id
+ *   TODO: why by ref?
+ * @return type
+ */
+function _drush_entity_op($op, $entity_type, &$entity_or_id) {
+  // We need to fix for D7 when $op == delete
+  $op_alias = $op;
+  if ($op == 'delete') {
+    // D7 operator rename ..
+    // TODO: is this changed ?
+    $op_alias = 'deletion';
+    // D6 user_delete requires two arguments
+    if (drush_drupal_major_version() < 7 && $entity_type == 'user') {
+      user_delete(array(), $entity_or_id);
+      return;
+    }
+  }
+  $info = _drush_entity_get_info($entity_type);
+
+  // TODO: add comment
+  if (isset($info['drush'][$op . ' needs'])) {
+    switch ($info['drush'][$op . ' needs']) {
+      case 'array':
+        $entity_or_id = (array) $entity_or_id;
+        break;
+      case 'entity':
+        $old = $entity_or_id;
+        $entity_or_id = reset(_drush_entity_load($entity_type, array($entity_or_id)));
+        if (empty($entity_or_id)) {
+          drush_log("Unable to run $op on $entity_type : $old", 'warning');
+          return;
+        }
+        break;
+      default:
+        break;
+    }
+  }
+  if (method_exists($entity_or_id, $op)) {
+    return $entity_or_id->$op();
+  }
+  elseif (isset($info[$op_alias . ' callback'])) {
+    return $info[$op . ' callback']($entity_or_id);
+  }
+  elseif (isset($info['controller class']) && in_array('EntityAPIControllerInterface', class_implements($info['controller class']))) {
+    return entity_get_controller($entity_type)->$op($entity_or_id);
+  }
+  elseif (function_exists($entity_type . '_' . $op)) {
+    $op_function = $entity_type . '_' . $op;
+    // Fix user_save
+    if ($op == 'save' && isset($info['drush']['save needs keys'])) {
+      $keys = (array) $entity_or_id;
+      return $op_function($entity_or_id, $keys);
+    }
+    else {
+      return $op_function($entity_or_id);
+    }
+  }
+  else {
+    drush_log("Unable to $op the entity $entity_or_id. Maybe you could try to install and enable the entity.module");
+    return FALSE;
+  }
+}
+
+/**
+ * Try to run _delete_multiple or otherwise iterate.
+ *
+ * @param type $entity_type
+ * @param type $ids
+ * @return type the delete results per type implementation
+ */
+function _drush_entity_delete($entity_type, $ids = array()) {
+  if ($entity_type == 'node') {
+    // We want to use _delete_multiple
+    $result = _drush_entity_delete_node($ids);
+  }
+  else {
+    $result = array();
+    foreach ($ids as $id) {
+      $result["$id"] = _drush_entity_op('delete', $entity_type, $id);
+    }
+  }
+  return $result;
+}
+
+/**
+ * This is special as we have node_delete_multiple
+ *
+ * The code for D6 is also special as cache_clear_all is only invoked in the end
+ *
+ * @param array $nids
+ * //TODO : better doc please
+ * @return the drupal behaviour for the delete function used.
+ */
+function _drush_entity_delete_node(array $nids) {
+  if (drush_drupal_major_version() >= 7) {
+    return node_delete_multiple($nids);
+  }
+  else {
+    // Drupal 5/6
+    // node-delete is implemented this way to prevent calling cache_clear_all() for each node.
+    foreach ($nids as $nid) {
+      $node = node_load($nid, NULL, TRUE);
+      db_query('DELETE FROM {node} WHERE nid = %d', $nid);
+      db_query('DELETE FROM {node_revisions} WHERE nid = %d', $nid);
+      node_invoke($node, 'delete');
+      node_invoke_nodeapi($node, 'delete');
+      if (function_exists('search_wipe')) {
+        search_wipe($node->nid, 'node');
+      }
+    }
+    cache_clear_all();
+  }
+}
+
+/**
+ * Wrapper for entity_info()
+ *
+ * We wrap entity_info to make D5/6 compatible
+ */
+function _drush_entity_get_info($entity_type = NULL) {
+  static $entities_info;
+
+  if (!isset($entities_info)) {
+    if (drush_drupal_major_version() < 7) {
+      /*
+       * Mapping for D6/5 which mimic D7 info structure
+       */
+      $entities_info = array(
+        'node' => array(
+          'entity keys' => array(
+            'id' => 'nid',
+            'revision' => 'vid',
+            'label' => 'title',
+          ),
+          'drush' => array(
+            'defaults' => array(
+              'type' => '',
+              'title' => '',
+            ),
+            // What fields to zap for a new entity
+            'new' => array('nid', 'vid'),
+          ),
+          'load list sql' => 'select nid id from {node}',
+        ),
+        'user' => array(
+          'entity keys' => array(
+            'id' => 'nid',
+            'label' => 'name',
+          ),
+          'drush' => array(
+            'defaults' => array(
+              'name' => '',
+            ),
+            // What fields to zap for a new entity
+            'new' => array('uid'),
+            // user_save needs list of keys
+            'save needs keys' => TRUE,
+          ),
+          'load list sql' => 'select uid id from {users}',
+        ),
+        'taxonomy_vocabulary' => array(
+          'entity keys' => array(
+            'id' => 'nid',
+            'label' => 'name',
+          ),
+          'drush' => array(
+            'defaults' => array(
+              'name' => '',
+            ),
+            // What fields to zap for a new entity
+            'new' => array('vid'),
+          ),
+          'load list sql' => 'select vid id from {vocabulary}',
+        ),
+        'taxonomy_term' => array(
+          'entity keys' => array(
+            'id' => 'nid',
+            'label' => 'name',
+          ),
+          'drush' => array(
+            'defaults' => array(
+              'name' => '',
+            ),
+            // What fields to zap for a new entity
+            'new' => array('tid'),
+            'save needs' => 'array',
+          ),
+          'load list sql' => 'select tid id from {term_data}',
+          'load callback' => 'taxonomy_get_term',
+          'save callback' => 'taxonomy_save_term',
+        ),
+      );
+    }
+    else {
+      $entities_info = entity_get_info();
+      foreach ($entities_info as $key => $info) {
+        $entities_info[$key]['drush'] = array(
+          'defaults' => array(
+          ),
+        );
+        if (drush_get_option('include-fieldapi', FALSE)) {
+          // Add field related values
+          foreach ($entities_info[$key]['bundles'] as $bundle => $dummy) {
+            // Merge in the fields
+            $field_info_instances = field_info_instances($key, $bundle);
+            if ($field_info_instances) {
+              $entities_info[$key]['field_info_instances'][$bundle] = $field_info_instances;
+            }
+            // Merge in the pseudo fields
+            foreach (array('form', 'display') as $context) {
+              $field_info_extra_fields = field_info_extra_fields($entity_type, $bundle, $context);
+              if ($field_info_extra_fields) {
+                $entities_info[$key]['field_info_extra_fields'][$bundle][$context] = $field_info_extra_fields;
+              }
+            }
+          }
+        }
+      }
+      // What keys to delete on create
+      $entities_info['node']['drush']['new'] = array('nid', 'vid');
+      $entities_info['user']['drush']['new'] = array('uid');
+      $entities_info['file']['drush']['new'] = array('fid');
+
+      // Defaults
+      $entities_info['node']['drush']['defaults']['type'] = '';
+      $entities_info['node']['drush']['defaults']['title'] = '';
+      $entities_info['node']['drush']['defaults']['language'] = 'und';
+      $entities_info['node']['drush']['defaults']['body'] = array(
+        LANGUAGE_NONE => array(
+          0 => array(
+            'value' => "",
+            'format' => filter_default_format(),
+          ),
+        ),
+      );
+      // To delete a file we need the file object
+      $entities_info['file']['drush']['delete needs'] = 'entity';
+    }
+  }
+  if (isset($entity_type)) {
+    return $entities_info[$entity_type];
+  }
+  return $entities_info;
+}
+
+/**
+ * Print the given object depending on json switch
+ *
+ * @param $object
+ */
+function _drush_entity_print($object, $format = NULL, $header = '') {
+  if (drush_get_option('json')) {
+    // php-5.4.0 : JSON_PRETTY_PRINT
+    drush_print(drush_json_encode($object));
+  }
+  else {
+    if ($header) {
+      drush_print($header);
+    }
+    if ($format == DRUSH_ENTITY_SEPARATED_SPACE) {
+      drush_print(join(" ", (array) $object));
+    }
+    else {
+      //$object = drush_json_decode(drush_json_encode($object));
+      drush_print_r($object);
+    }
+  }
+}
+
+/**
+ * Prevent D5/6 from invoking wrong types
+ *
+ * @param type $type
+ */
+function _drush_entity_check_type($type) {
+  switch (drush_drupal_major_version()) {
+    case 5:
+    case 6:
+      $entity_info = _drush_entity_get_info();
+      if (!isset($entity_info[$type])) {
+        drush_die("No support for $type for drupal core < 7.x");
+      }
+  }
+}
