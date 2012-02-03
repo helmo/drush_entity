@@ -45,6 +45,21 @@ function entity_drush_command() {
     'aliases' => array('etr'),
   );
 
+  $items['entity-list'] = array(
+    'callback' => 'drush_entity_list',
+    'description' => 'Get a list of entity information in a summary table.',
+    //'bootstrap' => DRUSH_BOOTSTRAP_DRUPAL_FULL,
+    'aliases' => array('el'),
+    'arguments' => array(
+      'type' => dt('A comma separated list of entities to show.'),
+    ),
+    'examples' => array(
+      'entity-list' => 'Displays all entities',
+      'entity-list node' => 'Displays only node entity',
+      'entity-list node,user' => 'Displays node and user entity',
+    ),
+  );
+
   /*
    * Entity commands
    */
@@ -135,8 +150,97 @@ function entity_drush_help($section) {
     case 'drush:entity-edit':
       return dt("Edit an entity as json in the default editor");
     case 'drush:entity-delete':
-      return dt('Delete entities.');
+      return dt("Delete entities.");
+    case 'meta:entity:title':
+      return dt("Entity commands");
+    case 'meta:entity:summary':
+      return dt("View, Add, and Delete entities.");
   }
+}
+
+/**
+ * Drush callback function to get entity info.
+ */
+function drush_entity_list($types = NULL) {
+  $entities = _drush_entity_get_info();
+
+  if ($types) {
+    $types = explode(',', $types);
+    foreach (array_keys($entities) as $entity) {
+      if (!in_array($entity, $types)) {
+        unset($entities[$entity]);
+      }
+    }
+  }
+  
+  $count = count($entities);
+  drush_print("Entity count: $count\n");
+
+  $header = array(
+    dt("Entity"),
+    dt("Label"),
+    dt("Bundles"),
+    dt("Base table"),
+    dt("Revision table"),
+    dt("Count"),
+    dt("Fieldable"),
+    dt("Entity class"),
+    dt("Controller class"),
+  );
+
+  $rows = array();
+  $row = array();
+  foreach ($entities as $machine => $info) {
+    $row[] = $machine;
+    $row[] = isset($info['label']) ? $info['label'] : dt("No label found");
+    $row[] = is_array($info['bundles']) ? _drush_entity_get_bundle_labels($info['bundles']) : NULL;
+    $row[] = $info['base table'];
+    $row[] = isset($info['revision table']) ? $info['revision table'] : NULL;
+    $row[] = _drush_entity_count_table($info['base table']);
+    $row[] = $info['fieldable'] ? dt("TRUE") : dt("FALSE");
+    $row[] = isset($info['entity class']) ? $info['entity class'] : dt("Default");
+    $row[] = isset($info['controller class']) ? $info['controller class'] : dt("Default");
+    // Add row to rows array.
+    $rows[] = $row;
+    //Unset so we can start again on next iteration.
+    unset($row);
+  }
+  array_unshift($rows, $header);
+
+  drush_print_table($rows, TRUE);
+}
+
+/**
+ * Get a total count of an entity type.
+ *
+ * @param $entity_type
+ * @return (int) count of entities.
+ */
+function _drush_entity_count_table($entity_type = NULL) {
+  if (!$entity_type) {
+    return NULL;
+  }
+  $query = new EntityFieldQuery();
+  $entities = $query->entityCondition('entity_type', $entity_type)->execute();
+  return count($entities[$entity_type]);
+}
+
+/**
+ * Get list of bundle labels for an entity type.
+ * This list can be returned as an array or csv list.
+ *
+ * @param $bundles
+ *  bundles array from entity_get_info().
+ * @param $csv
+ *  (bool) return as csv list or as array of bundle labels.
+ */
+function _drush_entity_get_bundle_labels($bundles, $csv = TRUE) {
+  $labels = array();
+  foreach ($bundles as $bundle_key => $bundle_info) {
+    $label = isset($bundle_info['label']) ? $bundle_info['label'] : dt("No label found"); 
+    $labels[] = $bundle_info['label'] . " ($bundle_key)";
+  }
+  return $csv ? implode(', ', $labels) : $labels;
 }
 
 /**
