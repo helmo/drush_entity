@@ -196,12 +196,12 @@ function drush_entity_list($types = NULL) {
     $row[] = is_array($info['bundles']) ? _drush_entity_get_bundle_labels($info['bundles']) : NULL;
     $row[] = $info['base table'];
     $row[] = isset($info['revision table']) ? $info['revision table'] : NULL;
-    $row[] = _drush_entity_count_table($info['base table']);
+    $row[] = _drush_entity_count_table($machine);
     $row[] = $info['fieldable'] ? dt("TRUE") : dt("FALSE");
     $row[] = isset($info['entity class']) ? $info['entity class'] : dt("Default");
     $row[] = isset($info['controller class']) ? $info['controller class'] : dt("Default");
     // Add row to rows array.
-    $rows[] = $row;
+    $rows[$machine] = $row;
     //Unset so we can start again on next iteration.
     unset($row);
   }
