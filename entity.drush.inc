@@ -220,9 +220,18 @@ function _drush_entity_count_table($entity_type = NULL) {
   if (!$entity_type) {
     return NULL;
   }
-  $query = new EntityFieldQuery();
-  $entities = $query->entityCondition('entity_type', $entity_type)->execute();
-  return count($entities[$entity_type]);
+  if (drush_drupal_major_version() < 7) {
+    $entity_info = _drush_entity_get_info($entity_type);
+    //drush_print_r($entity_info);
+    $table = db_escape_table($entity_info['base table']);
+    $count = db_result(db_query("SELECT COUNT(*) FROM {{$table}}"));
+  }
+  else {
+    $query = new EntityFieldQuery();
+    $entities = $query->entityCondition('entity_type', $entity_type)->execute();
+    $count = count($entities[$entity_type]);
+  }
+  return $count ? $count : 0;
 }
 
 /**
@@ -237,8 +246,14 @@ function _drush_entity_count_table($entity_type = NULL) {
 function _drush_entity_get_bundle_labels($bundles, $csv = TRUE) {
   $labels = array();
   foreach ($bundles as $bundle_key => $bundle_info) {
-    $label = isset($bundle_info['label']) ? $bundle_info['label'] : dt("No label found"); 
-    $labels[] = $bundle_info['label'] . " ($bundle_key)";
+    if (drush_drupal_major_version() < 7) {
+      $bundle_name = $bundle_info;
+    }
+    else {
+      $bundle_name = $bundle_info['label'];
+    }
+    $label = isset($bundle_name) ? $bundle_name : dt("No label found"); 
+    $labels[] = $label . " ($bundle_key)";
   }
   return $csv ? implode(', ', $labels) : $labels;
 }
@@ -872,11 +887,15 @@ function _drush_entity_get_info($entity_type = NULL) {
        */
       $entities_info = array(
         'node' => array(
+          'label' => 'Node',
+          'base table' => 'node',
           'entity keys' => array(
             'id' => 'nid',
             'revision' => 'vid',
             'label' => 'title',
           ),
+          'bundles' => node_get_types('names'),
+          'fieldable' => TRUE,
           'drush' => array(
             'defaults' => array(
               'type' => '',
@@ -888,10 +907,14 @@ function _drush_entity_get_info($entity_type = NULL) {
           'load list sql' => 'select nid id from {node}',
         ),
         'user' => array(
+          'label' => 'User',
+          'base table' => 'users',
           'entity keys' => array(
             'id' => 'nid',
             'label' => 'name',
           ),
+          'bundles' => array(),
+          'fieldable' => FALSE,
           'drush' => array(
             'defaults' => array(
               'name' => '',
@@ -904,10 +927,14 @@ function _drush_entity_get_info($entity_type = NULL) {
           'load list sql' => 'select uid id from {users}',
         ),
         'taxonomy_vocabulary' => array(
+          'label' => 'Taxonomy vocabulary',
+          'base table' => 'vocabulary',
           'entity keys' => array(
             'id' => 'nid',
             'label' => 'name',
           ),
+          'bundles' => array(),
+          'fieldable' => FALSE,
           'drush' => array(
             'defaults' => array(
               'name' => '',
@@ -918,10 +945,14 @@ function _drush_entity_get_info($entity_type = NULL) {
           'load list sql' => 'select vid id from {vocabulary}',
         ),
         'taxonomy_term' => array(
+          'label' => 'Taxonomy term',
+          'base table' => 'term_data',
           'entity keys' => array(
             'id' => 'nid',
             'label' => 'name',
           ),
+          'bundles' => array(),
+          'fieldable' => FALSE,
           'drush' => array(
             'defaults' => array(
               'name' => '',
