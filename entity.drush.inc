@@ -923,3 +923,33 @@ function _drush_entity_check_type($type) {
       }
   }
 }
+
+/**
+ * Helper to prevent recursion on objects
+ *
+ * @see drush_format_properties().
+ *
+ * @param type $cache
+ *   Reference array
+ * @param type $value
+ *   A value of any kind
+ * @return boolean
+ *   The current $value is not an object or not visited yet
+ */
+function _drush_visit_object(&$object_hash_list, $value) {
+  if (!is_array($object_hash_list)) {
+    $object_hash_list = array();
+  }
+  if (is_object($value)) {
+    $hash = spl_object_hash($value);
+    if (isset($object_hash_list[$hash])) {
+      return FALSE;
+    }
+    $object_hash_list[$hash] = $hash;
+    return TRUE;
+  }
+  else if (is_array($value)) {
+    return TRUE;
+  }
+  return FALSE;
+}
