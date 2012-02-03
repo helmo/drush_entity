@@ -442,7 +442,7 @@ function _drush_entity_read_list($entity_type) {
  */
 function drush_entity_read($entity_type = NULL) {
   if (!isset($entity_type)) {
-    drush_die("You must specify an entity_type");
+    drush_set_error('DRUSH_ERROR', dt("You must specify an entity_type"));
   }
   $ids = func_get_args();
   $entity_type = array_shift($ids);
@@ -482,10 +482,10 @@ function _drush_entity_select_fields($entities, $fields, $allow_path = FALSE) {
   if (!$allow_path) {
     foreach ($fields as $path) {
       if (strpos($path, '/') !== FALSE) {
-        drush_die("No path supported yet : $path");
+        drush_set_error('DRUSH_ERROR', dt("No path supported yet : $path"));
       }
       if (strpos($path, '*') !== FALSE) {
-        drush_die("No wildcard supported yet : $path");
+        drush_set_error('DRUSH_ERROR', dt("No wildcard supported yet : $path"));
       }
     }
   }
@@ -505,7 +505,7 @@ function _drush_entity_select_fields($entities, $fields, $allow_path = FALSE) {
  */
 function drush_entity_create($entity_type, $arg = NULL) {
   if (!isset($entity_type)) {
-    drush_die("You must specify a entity_type");
+    drush_set_error('DRUSH_ERROR', dt("You must specify a entity_type"));
   }
 
 //  if (!drush_get_option('json')) {
@@ -535,7 +535,7 @@ function drush_entity_create($entity_type, $arg = NULL) {
     }
   }
   else {
-    drush_die("Improper input/args");
+    drush_set_error('DRUSH_ERROR', dt("Improper input/args"));
   }
 
   if (!empty($entity_json)) {
@@ -687,11 +687,11 @@ function _drush_entity_load($entity_type, $ids) {
  */
 function drush_entity_delete($entity_type, $ids = NULL) {
   if (!isset($entity_type)) {
-    drush_die("You must specify an entity type");
+    drush_set_error('DRUSH_ERROR', dt("You must specify an entity type"));
   }
   $info = _drush_entity_get_info($entity_type);
   if (!isset($info)) {
-    drush_die("Type '$entity_type' does not exist.");
+    drush_set_error('DRUSH_ERROR', dt("Type '$entity_type' does not exist."));
   }
   $ids = func_get_args();
   $entity_type = array_shift($ids);
@@ -1023,7 +1023,7 @@ function _drush_entity_check_type($type) {
     case 6:
       $entity_info = _drush_entity_get_info();
       if (!isset($entity_info[$type])) {
-        drush_die("No support for $type for drupal core < 7.x");
+        drush_set_error('DRUSH_ERROR', dt("No support for $type for drupal core < 7.x"));
       }
   }
 }
