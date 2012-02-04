@@ -322,7 +322,7 @@ function _drush_entity_filter_fields(array $value, array $paths, array $delete_p
             array_push($paths, $new_path);
           }
           // We cast to array only to generate paths
-          $p_options = array_keys((array)$work_value);
+          $p_options = array_keys((array) $work_value);
           //$p = array_shift($p_options);
           foreach ($p_options as $p_option) {
             // Create
