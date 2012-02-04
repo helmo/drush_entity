@@ -967,6 +967,11 @@ function _drush_entity_get_info($entity_type = NULL) {
           'save callback' => 'taxonomy_save_term',
         ),
       );
+      // Added entity counts
+      foreach ($entities_info as $key => $info) {
+        $table = db_escape_table($info['base table']);
+        $entities_info[$key]['drush']['count'] = db_result(db_query("SELECT COUNT(*) FROM {{$table}}"));
+      }
     }
     else {
       $entities_info = entity_get_info();
@@ -977,7 +982,7 @@ function _drush_entity_get_info($entity_type = NULL) {
         );
         $query = new EntityFieldQuery();
         $entities = $query->entityCondition('entity_type', $key)->execute();
-        $entities_info[$key]['drush']['count'] = count($entities[$key]);
+        $entities_info[$key]['drush']['count'] = isset($entities[$entity_type]) ? count($entities[$entity_type]) : 0;
 
         if (drush_get_option('include-fieldapi', FALSE)) {
           // Add field related values
