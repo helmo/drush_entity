@@ -229,9 +229,9 @@ function _drush_entity_count_table($entity_type = NULL) {
   else {
     $query = new EntityFieldQuery();
     $entities = $query->entityCondition('entity_type', $entity_type)->execute();
-    $count = count($entities[$entity_type]);
+    $count = isset($entities[$entity_type]) ? count($entities[$entity_type]) : 0;
   }
-  return $count ? $count : 0;
+  return $count;
 }
 
 /**
