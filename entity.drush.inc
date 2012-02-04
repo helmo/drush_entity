@@ -172,7 +172,7 @@ function drush_entity_list($types = NULL) {
       }
     }
   }
-  
+
   $count = count($entities);
   drush_print("Entity count: $count\n");
 
@@ -188,6 +188,7 @@ function drush_entity_list($types = NULL) {
     dt("Controller class"),
   );
 
+  // drush etr `drush etr` --fields="bundles/*/label,label,base table,revision table,fieldable,entity class,controller class,drush/count"
   $rows = array();
   $row = array();
   foreach ($entities as $machine => $info) {
@@ -252,7 +253,7 @@ function _drush_entity_get_bundle_labels($bundles, $csv = TRUE) {
     else {
       $bundle_name = $bundle_info['label'];
     }
-    $label = isset($bundle_name) ? $bundle_name : dt("No label found"); 
+    $label = isset($bundle_name) ? $bundle_name : dt("No label found");
     $labels[] = $label . " ($bundle_key)";
   }
   return $csv ? implode(', ', $labels) : $labels;
@@ -974,6 +975,10 @@ function _drush_entity_get_info($entity_type = NULL) {
           'defaults' => array(
           ),
         );
+        $query = new EntityFieldQuery();
+        $entities = $query->entityCondition('entity_type', $key)->execute();
+        $entities_info[$key]['drush']['count'] = count($entities[$key]);
+
         if (drush_get_option('include-fieldapi', FALSE)) {
           // Add field related values
           foreach ($entities_info[$key]['bundles'] as $bundle => $dummy) {
@@ -1057,4 +1062,34 @@ function _drush_entity_check_type($type) {
         drush_set_error('DRUSH_ERROR', dt("No support for $type for drupal core < 7.x"));
       }
   }
+}
+
+/**
+ * Helper to prevent recursion on objects
+ *
+ * @see drush_format_properties().
+ *
+ * @param type $cache
+ *   Reference array
+ * @param type $value
+ *   A value of any kind
+ * @return boolean
+ *   The current $value is not an object or not visited yet
+ */
+function _drush_entity_visit_object(&$object_hash_list, $value) {
+  if (!is_array($object_hash_list)) {
+    $object_hash_list = array();
+  }
+  if (is_object($value)) {
+    $hash = spl_object_hash($value);
+    if (isset($object_hash_list[$hash])) {
+      return FALSE;
+    }
+    $object_hash_list[$hash] = $hash;
+    return TRUE;
+  }
+  else if (is_array($value)) {
+    return TRUE;
+  }
+  return FALSE;
 }
