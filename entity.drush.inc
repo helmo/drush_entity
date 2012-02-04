@@ -936,7 +936,7 @@ function _drush_entity_check_type($type) {
  * @return boolean
  *   The current $value is not an object or not visited yet
  */
-function _drush_visit_object(&$object_hash_list, $value) {
+function _drush_entity_visit_object(&$object_hash_list, $value) {
   if (!is_array($object_hash_list)) {
     $object_hash_list = array();
   }
