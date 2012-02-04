@@ -197,7 +197,7 @@ function drush_entity_list($types = NULL) {
     $row[] = is_array($info['bundles']) ? _drush_entity_get_bundle_labels($info['bundles']) : NULL;
     $row[] = $info['base table'];
     $row[] = isset($info['revision table']) ? $info['revision table'] : NULL;
-    $row[] = _drush_entity_count_table($machine);
+    $row[] = $info['drush']['count'];
     $row[] = $info['fieldable'] ? dt("TRUE") : dt("FALSE");
     $row[] = isset($info['entity class']) ? $info['entity class'] : dt("Default");
     $row[] = isset($info['controller class']) ? $info['controller class'] : dt("Default");
@@ -209,30 +209,6 @@ function drush_entity_list($types = NULL) {
   array_unshift($rows, $header);
 
   drush_print_table($rows, TRUE);
-}
-
-/**
- * Get a total count of an entity type.
- *
- * @param $entity_type
- * @return (int) count of entities.
- */
-function _drush_entity_count_table($entity_type = NULL) {
-  if (!$entity_type) {
-    return NULL;
-  }
-  if (drush_drupal_major_version() < 7) {
-    $entity_info = _drush_entity_get_info($entity_type);
-    //drush_print_r($entity_info);
-    $table = db_escape_table($entity_info['base table']);
-    $count = db_result(db_query("SELECT COUNT(*) FROM {{$table}}"));
-  }
-  else {
-    $query = new EntityFieldQuery();
-    $entities = $query->entityCondition('entity_type', $entity_type)->execute();
-    $count = isset($entities[$entity_type]) ? count($entities[$entity_type]) : 0;
-  }
-  return $count;
 }
 
 /**
@@ -982,7 +958,7 @@ function _drush_entity_get_info($entity_type = NULL) {
         );
         $query = new EntityFieldQuery();
         $entities = $query->entityCondition('entity_type', $key)->execute();
-        $entities_info[$key]['drush']['count'] = isset($entities[$entity_type]) ? count($entities[$entity_type]) : 0;
+        $entities_info[$key]['drush']['count'] = isset($entities[$key]) ? count($entities[$key]) : 0;
 
         if (drush_get_option('include-fieldapi', FALSE)) {
           // Add field related values
