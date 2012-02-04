@@ -28,6 +28,13 @@ stamp
 drush --format=$FORMAT etr `drush etr` --fields="*/bundle" >> $OUTPUT
 stamp
 
+echo Next command fails generating an error or output. >> $OUTPUT
+drush --format=$FORMAT el >> $OUTPUT
+stamp
+
+drush el >> $OUTPUT
+stamp
+
 less $OUTPUT
 
 rm $OUTPUT
