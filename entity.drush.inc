@@ -172,7 +172,7 @@ function drush_entity_list($types = NULL) {
       }
     }
   }
-  
+
   $count = count($entities);
   drush_print("Entity count: $count\n");
 
@@ -252,7 +252,7 @@ function _drush_entity_get_bundle_labels($bundles, $csv = TRUE) {
     else {
       $bundle_name = $bundle_info['label'];
     }
-    $label = isset($bundle_name) ? $bundle_name : dt("No label found"); 
+    $label = isset($bundle_name) ? $bundle_name : dt("No label found");
     $labels[] = $label . " ($bundle_key)";
   }
   return $csv ? implode(', ', $labels) : $labels;
