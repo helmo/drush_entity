@@ -188,6 +188,7 @@ function drush_entity_list($types = NULL) {
     dt("Controller class"),
   );
 
+  // drush etr `drush etr` --fields="bundles/*/label,label,base table,revision table,fieldable,entity class,controller class,drush/count"
   $rows = array();
   $row = array();
   foreach ($entities as $machine => $info) {
@@ -974,6 +975,10 @@ function _drush_entity_get_info($entity_type = NULL) {
           'defaults' => array(
           ),
         );
+        $query = new EntityFieldQuery();
+        $entities = $query->entityCondition('entity_type', $key)->execute();
+        $entities_info[$key]['drush']['count'] = count($entities[$key]);
+
         if (drush_get_option('include-fieldapi', FALSE)) {
           // Add field related values
           foreach ($entities_info[$key]['bundles'] as $bundle => $dummy) {

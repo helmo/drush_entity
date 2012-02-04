@@ -8,6 +8,7 @@
 OUTPUT=$TMPDIR/drush.entity.log
 
 # We prefer properties as these are human readable
+# TODO wait for drush to implement these
 FORMAT=properties
 
 function stamp {
@@ -33,6 +34,10 @@ drush --format=$FORMAT el >> $OUTPUT
 stamp
 
 drush el >> $OUTPUT
+stamp
+
+echo Next command contains same info needed for drush el
+drush etr `drush etr` --fields="bundles/*/label,label,base table,revision table,fieldable,entity class,controller class,drush/count" >> $OUTPUT
 stamp
 
 less $OUTPUT
