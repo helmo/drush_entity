@@ -51,12 +51,12 @@ function entity_drush_command() {
     //'bootstrap' => DRUSH_BOOTSTRAP_DRUPAL_FULL,
     'aliases' => array('el'),
     'arguments' => array(
-      'type' => dt('A comma separated list of entities to show.'),
+      'types' => dt('A space separated list of entity types to show.'),
     ),
     'examples' => array(
-      'entity-list' => 'Displays all entities',
-      'entity-list node' => 'Displays only node entity',
-      'entity-list node,user' => 'Displays node and user entity',
+      'entity-list' => 'Displays all entity summaries',
+      'entity-list node' => 'Displays node entity summary',
+      'entity-list node user' => 'Displays node and user entity summaries.',
     ),
   );
 
@@ -161,11 +161,10 @@ function entity_drush_help($section) {
 /**
  * Drush callback function to get entity info.
  */
-function drush_entity_list($types = NULL) {
+function drush_entity_list() {
   $entities = _drush_entity_get_info();
-
-  if ($types) {
-    $types = explode(',', $types);
+  $types = func_get_args();
+  if (count($types)) {
     foreach (array_keys($entities) as $entity) {
       if (!in_array($entity, $types)) {
         unset($entities[$entity]);
@@ -305,7 +304,7 @@ function _drush_entity_filter_fields(array $value, array $paths, array $delete_p
     $head = array();
     // The result is a linked list done with an key => array construct
     $tail = &$head;  // By ref
-    $sub_tree = split('/', $path);
+    $sub_tree = explode('/', $path);
     $current_path = '';
     $work_value = $value;
     $failed_path = FALSE;
@@ -579,7 +578,7 @@ function _drush_entity_edit_string($string) {
 function _drush_entity_get_fields() {
   $fields = drush_get_option('fields', '');
   if ($fields) {
-    return split(',', $fields);
+    return explode(',', $fields);
   }
   return array();
 }
@@ -593,7 +592,7 @@ function _drush_entity_get_exclude_fields() {
   else {
     $fields .= ',drush';
   }
-  $exclude_fields = split(',', $fields);
+  $exclude_fields = explode(',', $fields);
   return array_diff($exclude_fields, _drush_entity_get_fields());
 }
 
