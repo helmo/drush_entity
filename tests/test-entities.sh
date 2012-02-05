@@ -17,27 +17,52 @@ function stamp {
   echo ============== >> $OUTPUT
 }
 
+function log {
+  echo $1
+  echo == $1 == >> $OUTPUT
+}
+
 echo > $OUTPUT
 stamp
 
-drush --format=$FORMAT etr >> $OUTPUT
+log "List of available entities."
+drush --format=$FORMAT entity-type-read >> $OUTPUT
 stamp
 
-drush --format=$FORMAT etr `drush etr` >> $OUTPUT
+log "Reading all entity types information."
+drush --format=$FORMAT entity-type-read `drush entity-type-read` >> $OUTPUT
 stamp
 
-drush --format=$FORMAT etr `drush etr` --fields="*/bundle" >> $OUTPUT
+log "Reading all entity types */bundle values."
+drush --format=$FORMAT entity-type-read `drush entity-type-read` --fields="*/bundle" >> $OUTPUT
 stamp
 
-echo Next command fails generating an error or output. >> $OUTPUT
+log "Next command fails generating an error or output."
 drush --format=$FORMAT el >> $OUTPUT
 stamp
 
+log "Listing entities in table format."
 drush el >> $OUTPUT
 stamp
 
-echo Next command contains same info needed for drush el
+log "Next command contains same info needed for drush el"
 drush etr `drush etr` --fields="bundles/*/label,label,base table,revision table,fieldable,entity class,controller class,drush/count" >> $OUTPUT
+stamp
+
+log "Reading node ids."
+drush entity-read node >> $OUTPUT
+stamp
+
+log "Reading nodes info."
+drush entity-read node `drush entity-read node` >> $OUTPUT
+stamp
+
+log "Reading users info."
+drush entity-read user `drush entity-read user` >> $OUTPUT
+stamp
+
+log "Reading files info."
+drush entity-read file `drush entity-read file` >> $OUTPUT
 stamp
 
 less $OUTPUT
