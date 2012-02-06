@@ -47,8 +47,7 @@ function entity_drush_command() {
 
   $items['entity-list'] = array(
     'callback' => 'drush_entity_list',
-    'description' => 'Get a list of entity information in a summary table.',
-    //'bootstrap' => DRUSH_BOOTSTRAP_DRUPAL_FULL,
+    'description' => 'Get a list of entity type information in a summary table.',
     'aliases' => array('el'),
     'arguments' => array(
       'types' => dt('A space separated list of entity types to show.'),
@@ -86,6 +85,7 @@ function entity_drush_command() {
     'options' => array(
       'format' => $output_format,
       'fields' => 'fields of type to list specific info',
+      'bundles' => 'Filter by entity bundles. Provide a comma separated list of entity types.',
     ),
     'examples' => array(
       'entity-read user 4' => 'Print the user object 4',
@@ -173,7 +173,7 @@ function drush_entity_list() {
   }
 
   $count = count($entities);
-  drush_print("Entity count: $count\n");
+  drush_print("\nEntity count: $count\n");
 
   $header = array(
     dt("Entity"),
@@ -411,17 +411,23 @@ function _drush_entity_id_list($entity_type, $print = TRUE) {
   }
   else {
     $query = new EntityFieldQuery();
-    $entities = $query->entityCondition('entity_type', $entity_type)->execute();
+    $query->entityCondition('entity_type', $entity_type);
+    if ($bundles = _drush_entity_get_bundles()) {
+      $query->entityCondition('bundle', $bundles);
+      //Return bundles values back to csv format.
+      $bundle_list = implode(',', $bundles);
+    }
+    $entities = $query->execute();
   }
-
-  if (count($entities)) {
+  // Will only be set if there are results.
+  if (isset($entities[$entity_type])) {
     $result = array_keys($entities[$entity_type]);
     $format = DRUSH_ENTITY_SEPARATED_SPACE;
-    $header = "Available ids for $entity_type";
+    $header = $bundles ? dt("Available $bundle_list ids for $entity_type") : dt("Available ids for $entity_type");
   }
   else {
     $format = DRUSH_ENTITY_SEPARATED_SPACE;
-    $header = "No ids for $entity_type";
+    $header = $bundles ? dt("No $bundle_list entities found for $entity_type.") : dt("No ids for $entity_type");
     $result = array();
   }
 
@@ -578,6 +584,19 @@ function _drush_entity_edit_string($string) {
 }
 
 /**
+ * Convert bundles passed as drush options into array of bundle types.
+ *
+ * @return array of bundles types.
+ */
+function _drush_entity_get_bundles() {
+  $bundles = drush_get_option('bundles');
+  if ($bundles) {
+    return explode(',', $bundles);
+  }
+  return FALSE;
+}
+
+/**
  * Convert the given fields into an array
  *
  * @return Array
@@ -705,9 +724,12 @@ function drush_entity_delete($entity_type = NULL, $ids = NULL) {
   }
   else {
     $ids = _drush_entity_id_list($entity_type, FALSE);
-    if (drush_confirm(dt("Are you sure you want to delete all $entity_type entities?"))) {
+    if (!empty($ids) && drush_confirm(dt("Are you sure you want to delete all $entity_type entities?"))) {
       _drush_entity_delete($entity_type, $ids);
       drush_print(dt("All $entity_type entities deleted."));
+    }
+    else {
+      drush_print(dt("There are no $entity_type entities to delete."));
     }
   }
 }
