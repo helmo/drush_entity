@@ -842,7 +842,7 @@ function _drush_entity_op($op, $entity_type, &$entity_or_id) {
 function _drush_entity_delete($entity_type, $ids = array()) {
   if ($entity_type == 'node') {
     // We want to use _delete_multiple
-    $result = _drush_entity_delete_node($ids);
+    return _drush_entity_delete_node($ids);
   }
   else {
     $result = array();
@@ -850,7 +850,7 @@ function _drush_entity_delete($entity_type, $ids = array()) {
       $result["$id"] = _drush_entity_op('delete', $entity_type, $id);
     }
   }
-  return array_keys($result);
+  return $result ? array_keys($result) : $result;
 }
 
 /**
@@ -864,7 +864,8 @@ function _drush_entity_delete($entity_type, $ids = array()) {
  */
 function _drush_entity_delete_node(array $nids) {
   if (drush_drupal_major_version() >= 7) {
-    return node_delete_multiple($nids);
+    node_delete_multiple($nids);
+    return $nids;
   }
   else {
     // Drupal 5/6
@@ -881,6 +882,8 @@ function _drush_entity_delete_node(array $nids) {
     }
     cache_clear_all();
   }
+  
+  return $nids;
 }
 
 /**
