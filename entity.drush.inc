@@ -719,7 +719,8 @@ function drush_entity_delete($entity_type = NULL, $ids = NULL) {
   if (!empty($ids)) {
     $result = _drush_entity_delete($entity_type, $ids);
     if (count($result) > 0) {
-      _drush_entity_print($result);
+      $header = dt("\nDeleted $entity_type entities:");
+      _drush_entity_print($result, DRUSH_ENTITY_SEPARATED_SPACE, $header);
     }
   }
   else {
@@ -849,7 +850,7 @@ function _drush_entity_delete($entity_type, $ids = array()) {
       $result["$id"] = _drush_entity_op('delete', $entity_type, $id);
     }
   }
-  return $result;
+  return array_keys($result);
 }
 
 /**
@@ -1056,7 +1057,7 @@ function _drush_entity_print($object, $format = NULL, $header = '') {
       drush_print($header);
     }
     if ($format == DRUSH_ENTITY_SEPARATED_SPACE) {
-      drush_print(join(" ", (array) $object));
+      drush_print(implode(" ", (array) $object) . "\n");
     }
     else {
       //$object = drush_json_decode(drush_json_encode($object));
