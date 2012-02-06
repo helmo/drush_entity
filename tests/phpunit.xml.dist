@@ -2,7 +2,7 @@
 <phpunit backupGlobals="false"
     backupStaticAttributes="false"
     syntaxCheck="false"
-    bootstrap="drush_testcase.inc">
+    bootstrap="your/path/to/drush/tests/drush_testcase.inc">
   <testsuites>
     <testsuite name="Drush Test Suite">
       <directory>.</directory>
