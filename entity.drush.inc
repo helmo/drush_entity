@@ -47,16 +47,15 @@ function entity_drush_command() {
 
   $items['entity-list'] = array(
     'callback' => 'drush_entity_list',
-    'description' => 'Get a list of entity information in a summary table.',
-    //'bootstrap' => DRUSH_BOOTSTRAP_DRUPAL_FULL,
+    'description' => 'Get a list of entity type information in a summary table.',
     'aliases' => array('el'),
     'arguments' => array(
-      'type' => dt('A comma separated list of entities to show.'),
+      'types' => dt('A space separated list of entity types to show.'),
     ),
     'examples' => array(
-      'entity-list' => 'Displays all entities',
-      'entity-list node' => 'Displays only node entity',
-      'entity-list node,user' => 'Displays node and user entity',
+      'entity-list' => 'Displays all entity summaries',
+      'entity-list node' => 'Displays node entity summary',
+      'entity-list node user' => 'Displays node and user entity summaries.',
     ),
   );
 
@@ -86,6 +85,7 @@ function entity_drush_command() {
     'options' => array(
       'format' => $output_format,
       'fields' => 'fields of type to list specific info',
+      'bundles' => 'Filter by entity bundles. Provide a comma separated list of entity types.',
     ),
     'examples' => array(
       'entity-read user 4' => 'Print the user object 4',
@@ -161,11 +161,10 @@ function entity_drush_help($section) {
 /**
  * Drush callback function to get entity info.
  */
-function drush_entity_list($types = NULL) {
+function drush_entity_list() {
   $entities = _drush_entity_get_info();
-
-  if ($types) {
-    $types = explode(',', $types);
+  $types = func_get_args();
+  if (count($types)) {
     foreach (array_keys($entities) as $entity) {
       if (!in_array($entity, $types)) {
         unset($entities[$entity]);
@@ -174,7 +173,7 @@ function drush_entity_list($types = NULL) {
   }
 
   $count = count($entities);
-  drush_print("Entity count: $count\n");
+  drush_print("\nEntity count: $count\n");
 
   $header = array(
     dt("Entity"),
@@ -232,7 +231,7 @@ function _drush_entity_get_bundle_labels($bundles, $csv = TRUE) {
     $label = isset($bundle_name) ? $bundle_name : dt("No label found");
     $labels[] = $label . " ($bundle_key)";
   }
-  return $csv ? implode(', ', $labels) : $labels;
+  return $csv ? implode("\n", $labels) : $labels;
 }
 
 /**
@@ -305,7 +304,7 @@ function _drush_entity_filter_fields(array $value, array $paths, array $delete_p
     $head = array();
     // The result is a linked list done with an key => array construct
     $tail = &$head;  // By ref
-    $sub_tree = split('/', $path);
+    $sub_tree = explode('/', $path);
     $current_path = '';
     $work_value = $value;
     $failed_path = FALSE;
@@ -393,8 +392,10 @@ function _drush_entity_filter_fields(array $value, array $paths, array $delete_p
  * List the entity IDs of the given type
  *
  * @param type $entity_type
+ * @param $print
+ *  print list of entities to screen or return as array.
  */
-function _drush_entity_read_list($entity_type) {
+function _drush_entity_id_list($entity_type, $print = TRUE) {
   $entity_info = _drush_entity_get_info($entity_type);
 
   if (drush_drupal_major_version() < 7) {
@@ -410,19 +411,30 @@ function _drush_entity_read_list($entity_type) {
   }
   else {
     $query = new EntityFieldQuery();
-    $entities = $query->entityCondition('entity_type', $entity_type)->execute();
+    $query->entityCondition('entity_type', $entity_type);
+    if ($bundles = _drush_entity_get_bundles()) {
+      $query->entityCondition('bundle', $bundles);
+      //Return bundles values back to csv format.
+      $bundle_list = implode(',', $bundles);
+    }
+    $entities = $query->execute();
   }
-
-  if (count($entities)) {
+  // Will only be set if there are results.
+  if (isset($entities[$entity_type])) {
     $result = array_keys($entities[$entity_type]);
     $format = DRUSH_ENTITY_SEPARATED_SPACE;
-    $header = "Available ids for $entity_type";
+    $header = $bundles ? dt("Available $bundle_list ids for $entity_type") : dt("Available ids for $entity_type");
   }
   else {
     $format = DRUSH_ENTITY_SEPARATED_SPACE;
-    $header = "No ids for $entity_type";
+    $header = $bundles ? dt("No $bundle_list entities found for $entity_type.") : dt("No ids for $entity_type");
     $result = array();
   }
+
+  if (!$print) {
+    return $result;
+  }
+
   _drush_entity_print($result, $format, $header);
 }
 
@@ -442,7 +454,7 @@ function drush_entity_read($entity_type = NULL) {
 
   // Do listing
   if (count($ids) == 0) {
-    _drush_entity_read_list($entity_type);
+    _drush_entity_id_list($entity_type);
     return;
   }
 
@@ -572,6 +584,19 @@ function _drush_entity_edit_string($string) {
 }
 
 /**
+ * Convert bundles passed as drush options into array of bundle types.
+ *
+ * @return array of bundles types.
+ */
+function _drush_entity_get_bundles() {
+  $bundles = drush_get_option('bundles');
+  if ($bundles) {
+    return explode(',', $bundles);
+  }
+  return FALSE;
+}
+
+/**
  * Convert the given fields into an array
  *
  * @return Array
@@ -579,7 +604,7 @@ function _drush_entity_edit_string($string) {
 function _drush_entity_get_fields() {
   $fields = drush_get_option('fields', '');
   if ($fields) {
-    return split(',', $fields);
+    return explode(',', $fields);
   }
   return array();
 }
@@ -593,7 +618,7 @@ function _drush_entity_get_exclude_fields() {
   else {
     $fields .= ',drush';
   }
-  $exclude_fields = split(',', $fields);
+  $exclude_fields = explode(',', $fields);
   return array_diff($exclude_fields, _drush_entity_get_fields());
 }
 
@@ -677,27 +702,36 @@ function _drush_entity_load($entity_type, $ids) {
 /**
  * Command callback.
  */
-function drush_entity_delete($entity_type, $ids = NULL) {
+function drush_entity_delete($entity_type = NULL, $ids = NULL) {
+  $ids = func_get_args();
+  $entity_type = array_shift($ids);
+
   if (!isset($entity_type)) {
     drush_set_error('DRUSH_ERROR', dt("You must specify an entity type"));
+    return;
   }
   $info = _drush_entity_get_info($entity_type);
   if (!isset($info)) {
     drush_set_error('DRUSH_ERROR', dt("Type '$entity_type' does not exist."));
+    return;
   }
-  $ids = func_get_args();
-  $entity_type = array_shift($ids);
 
-  if (!is_null($ids)) {
+  if (!empty($ids)) {
     $result = _drush_entity_delete($entity_type, $ids);
     if (count($result) > 0) {
-      _drush_entity_print($result);
+      $header = dt("\nDeleted $entity_type entities:");
+      _drush_entity_print($result, DRUSH_ENTITY_SEPARATED_SPACE, $header);
     }
   }
   else {
-    drush_log("NOT YET IMPLEMENTED ... Delete ALL entities of type $entity_type", "ERROR");
-    //$nids = drush_get_nodes_by_type($entity_type);
-    //_drush_entity_delete($entity_type, $nids);
+    $ids = _drush_entity_id_list($entity_type, FALSE);
+    if (!empty($ids) && drush_confirm(dt("Are you sure you want to delete all $entity_type entities?"))) {
+      _drush_entity_delete($entity_type, $ids);
+      drush_print(dt("All $entity_type entities deleted."));
+    }
+    else {
+      drush_print(dt("There are no $entity_type entities to delete."));
+    }
   }
 }
 
@@ -775,7 +809,7 @@ function _drush_entity_op($op, $entity_type, &$entity_or_id) {
   if (method_exists($entity_or_id, $op)) {
     return $entity_or_id->$op();
   }
-  elseif (isset($info[$op_alias . ' callback'])) {
+  elseif (isset($info[$op . ' callback'])) {
     return $info[$op . ' callback']($entity_or_id);
   }
   elseif (isset($info['controller class']) && in_array('EntityAPIControllerInterface', class_implements($info['controller class']))) {
@@ -808,7 +842,7 @@ function _drush_entity_op($op, $entity_type, &$entity_or_id) {
 function _drush_entity_delete($entity_type, $ids = array()) {
   if ($entity_type == 'node') {
     // We want to use _delete_multiple
-    $result = _drush_entity_delete_node($ids);
+    return _drush_entity_delete_node($ids);
   }
   else {
     $result = array();
@@ -816,7 +850,7 @@ function _drush_entity_delete($entity_type, $ids = array()) {
       $result["$id"] = _drush_entity_op('delete', $entity_type, $id);
     }
   }
-  return $result;
+  return $result ? array_keys($result) : $result;
 }
 
 /**
@@ -830,7 +864,8 @@ function _drush_entity_delete($entity_type, $ids = array()) {
  */
 function _drush_entity_delete_node(array $nids) {
   if (drush_drupal_major_version() >= 7) {
-    return node_delete_multiple($nids);
+    node_delete_multiple($nids);
+    return $nids;
   }
   else {
     // Drupal 5/6
@@ -847,6 +882,8 @@ function _drush_entity_delete_node(array $nids) {
     }
     cache_clear_all();
   }
+  
+  return $nids;
 }
 
 /**
@@ -999,8 +1036,11 @@ function _drush_entity_get_info($entity_type = NULL) {
       $entities_info['file']['drush']['delete needs'] = 'entity';
     }
   }
-  if (isset($entity_type)) {
+  if (isset($entity_type) && isset($entities_info[$entity_type])) {
     return $entities_info[$entity_type];
+  }
+  elseif (isset($entity_type) && !isset($entities_info[$entity_type])) {
+    return;
   }
   return $entities_info;
 }
@@ -1020,7 +1060,7 @@ function _drush_entity_print($object, $format = NULL, $header = '') {
       drush_print($header);
     }
     if ($format == DRUSH_ENTITY_SEPARATED_SPACE) {
-      drush_print(join(" ", (array) $object));
+      drush_print(implode(" ", (array) $object) . "\n");
     }
     else {
       //$object = drush_json_decode(drush_json_encode($object));
