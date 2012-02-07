@@ -189,6 +189,11 @@ function drush_entity_list() {
     dt("Controller class"),
   );
 
+  $newline = function($value) {
+     return $value . "\n";
+  };
+  $header = array_map($newline, $header);
+
   // drush etr `drush etr` --fields="bundles/*/label,label,base table,revision table,fieldable,entity class,controller class,drush/count"
   $rows = array();
   $row = array();
@@ -432,7 +437,7 @@ function _drush_entity_id_list($entity_type, $bundles = NULL, $print = TRUE) {
     if (isset($entities[$entity_type])) {
       $result = array_keys($entities[$entity_type]);
       $format = DRUSH_ENTITY_SEPARATED_SPACE;
-      $header = $bundles ? dt("\nAvailable $bundle_list ids for $entity_type\n") : dt("\nAvailable ids for $entity_type");
+      $header = $bundles ? dt("\nAvailable $bundle_list ids for $entity_type\n") : dt("\nAvailable ids for $entity_type\n");
     }
     else {
       $format = DRUSH_ENTITY_SEPARATED_SPACE;
