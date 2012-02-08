@@ -436,7 +436,8 @@ function _drush_entity_id_list($entity_type, $bundles = NULL, $print = TRUE) {
     // Will only be set if there are results.
     if (isset($entities[$entity_type])) {
       $result = array_keys($entities[$entity_type]);
-      $format = DRUSH_ENTITY_SEPARATED_SPACE;
+      $drush_format = drush_get_option('format');
+      $format = $drush_format ? $drush_format : DRUSH_ENTITY_SEPARATED_SPACE;
       $header = $bundles ? dt("\nAvailable $bundle_list ids for $entity_type\n") : dt("\nAvailable ids for $entity_type\n");
     }
     else {
@@ -1068,21 +1069,15 @@ function _drush_entity_get_info($entity_type = NULL) {
  * @param $object
  */
 function _drush_entity_print($object, $format = NULL, $header = '') {
-  if (drush_get_option('json')) {
-    // php-5.4.0 : JSON_PRETTY_PRINT
-    drush_print(drush_json_encode($object));
-  }
-  else {
+  if ($format == DRUSH_ENTITY_SEPARATED_SPACE) {
     if ($header) {
       drush_print($header);
     }
-    if ($format == DRUSH_ENTITY_SEPARATED_SPACE) {
-      drush_print(implode(" ", (array) $object) . "\n");
-    }
-    else {
-      //$object = drush_json_decode(drush_json_encode($object));
-      drush_print_r($object);
-    }
+    drush_print(implode(" ", (array) $object) . "\n");
+  }
+  else {
+    // Send it through drush_format.
+    drush_print(drush_format($object, $header, $format));
   }
 }
 
