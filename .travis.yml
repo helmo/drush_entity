@@ -7,7 +7,7 @@ env:
 before_script:
   - cd ..; git clone git://github.com/drush-ops/drush.git; cd drush_entity
   - export UNISH_DRUSH="${PWD}/../drush/drush" 
-  - export PHPUNIT_ARGS=--bootstrap="${PWD}/drush/tests/drush_testcase.inc"
+  - export PHPUNIT_ARGS=--bootstrap="${PWD}/../drush/tests/drush_testcase.inc"
   - cd tests
   - env
 script: phpunit $PHPUNIT_ARGS
