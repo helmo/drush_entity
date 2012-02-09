@@ -28,6 +28,10 @@ echo Reading node 6 IDS
 IDS=`drush entity-read node | grep -v node | cut -f 1-6 -d " "`
 
 stamp
+echo read nodes as json
+drush entity-read node $IDS --format=json
+
+stamp
 echo Deleting through entity-delete $IDS
 drush entity-delete node $IDS
 
@@ -46,6 +50,14 @@ drush entity-delete comment --yes
 stamp
 echo Deleting all nodes by list of IDs
 drush entity-delete node `drush entity-read node`
+
+stamp
+echo Creating 20 nodes
+drush genc 20
+
+stamp
+echo Delete all nodes of type page
+drush entity-delete node --bundles=page --yes
 
 stamp
 echo Delete all nodes

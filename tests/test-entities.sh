@@ -49,16 +49,20 @@ log "Next command contains same info needed for drush el"
 drush etr `drush etr` --fields="bundles/*/label,label,base table,revision table,fieldable,entity class,controller class,drush/count" >> $OUTPUT
 stamp
 
+log "Reading nodes info."
+drush entity-type-read node `drush entity-type-read node` >> $OUTPUT
+stamp
+
 log "Reading node ids."
 drush entity-read node >> $OUTPUT
 stamp
 
-log "Reading nodes info."
-drush entity-read node `drush entity-read node` >> $OUTPUT
+log "Reading users info."
+drush entity-type-read user `drush entity-type-read user` >> $OUTPUT
 stamp
 
-log "Reading users info."
-drush entity-read user `drush entity-read user` >> $OUTPUT
+log "Reading node ids."
+drush entity-read node >> $OUTPUT
 stamp
 
 log "Reading files info."

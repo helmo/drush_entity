@@ -40,7 +40,7 @@ function entity_drush_command() {
       'entity-type-read' => 'List available entity types',
       'entity-type-read node' => 'List node type information',
       'entity-type-read node --fields=bundles' => 'List bundles for node type',
-      "etr `drush etr` --fields='entity keys',fieldable" => 'List all entity keys and fieldable.',
+      "etr --fields='entity keys',fieldable" => 'List all entity keys and fieldable.',
       'entity-type-read node --fields=bundles/*/admin/path' => 'List admin path for all bundles',
     ),
     'aliases' => array('etr'),
@@ -156,7 +156,7 @@ function entity_drush_help($section) {
     case 'meta:entity:title':
       return dt("Entity commands");
     case 'meta:entity:summary':
-      return dt("View, Add, and Delete entities.");
+      return dt("Query (perform CRUD operations) drupal entities.");
   }
 }
 
@@ -166,6 +166,7 @@ function entity_drush_help($section) {
 function drush_entity_list() {
   $entities = _drush_entity_get_info();
   $types = func_get_args();
+
   if (count($types)) {
     foreach (array_keys($entities) as $entity) {
       if (!in_array($entity, $types)) {
@@ -247,20 +248,39 @@ function _drush_entity_get_bundle_labels($bundles, $csv = TRUE) {
  * @param type $type
  * @return type
  */
-function drush_entity_type_read($entity_type = NULL) {
+function drush_entity_type_read($entity_types = NULL) {
   $types = func_get_args();
   $entities_info = _drush_entity_get_info();
-
-  $format = drush_get_option('format', 'export');
+  $fields = _drush_entity_get_fields();
+  $format = drush_get_option('format', 'properties');
 
   // List the available types
-  if (empty($entity_type)) {
-    $result = array_keys($entities_info);
-    drush_print(drush_format($result, NULL, $format));
-    return;
+  if (!count($entity_types)) {
+    // Only provide choices if --fields option hasn't been populated.
+    if (!count($fields)) {
+      $options = array('types' => dt("Types only"), 'all' => dt("All info"));
+      if ($choice = drush_choice($options, 'Which entity information would you like to display?', '!value')) {
+        switch ($choice) {
+          case 'types':
+            $result = array_keys($entities_info);
+            $header = dt("Available entity types:\n");
+            drush_print(drush_format($result, $header, $format));
+            return;
+          case 'all':
+          default:
+            // Set the types to all, from entity info keys.
+            $types = array_keys($entities_info);
+        }
+      }
+      else {
+        return;
+      }
+    }
+    else {
+      $types = array_keys($entities_info);
+    }
   }
 
-  $fields = _drush_entity_get_fields();
   $result = array();
   if (count($types)) {
     foreach ($types as $type) {
@@ -432,6 +452,7 @@ function _drush_entity_id_list($entity_type, $bundles = NULL, $print = TRUE) {
     }
     $entities = $query->execute();
   }
+
   if ($print) {
     // Will only be set if there are results.
     if (isset($entities[$entity_type])) {
@@ -524,7 +545,7 @@ function _drush_entity_select_fields($entities, $fields, $allow_path = FALSE) {
  */
 function drush_entity_create($entity_type = NULL, $arg = NULL) {
   if (!$entity_type) {
-    drush_set_error('DRUSH_ERROR', dt("You must specify a entity_type"));
+    drush_set_error('DRUSH_ERROR', dt("You must specify an entity type"));
     return;
   }
 
@@ -537,7 +558,8 @@ function drush_entity_create($entity_type = NULL, $arg = NULL) {
   $entity_info = _drush_entity_get_info($entity_type);
 
   if (empty($arg)) {
-    $entity = new stdClass();
+    $entity_class = isset($entity_info['entity class']) ? $entity_info['entity class'] : 'stdClass';
+    $entity = new $entity_class();
     if (isset($entity_info['drush']['defaults'])) {
       foreach ($entity_info['drush']['defaults'] as $key => $value) {
         $entity->$key = $value;
@@ -618,7 +640,7 @@ function _drush_entity_get_bundles() {
  * @return Array
  */
 function _drush_entity_get_fields() {
-  $fields = drush_get_option('fields', '');
+  $fields = drush_get_option('fields');
   if ($fields) {
     return explode(',', $fields);
   }
