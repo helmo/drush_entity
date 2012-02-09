@@ -1,0 +1,12 @@
+# Configuration file for unit test runner at http://travis-ci.org/#!/drush-ops/drush
+language: php
+php:
+  - 5.3
+  - 5.4
+env:
+  - UNISH_DB_URL=mysql://root:@127.0.0.1 
+before_script:
+  - cd ..; git clone git://github.com/drush-ops/drush.git; cd drush_entity
+  - export UNISH_DRUSH="${PWD}/drush" && cd tests
+script: phpunit $PHPUNIT_ARGS
+
