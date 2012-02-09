@@ -10,7 +10,7 @@ class EntityTestCase extends Drush_CommandTestCase {
   public static function setUpBeforeClass() {
     parent::setUpBeforeClass();
     // cwd == sandbox
-    exec('symlink ' .escapeshellarg('/home/vagrant/builds/helmo/drush_entity')
+    exec('ln -s ' .escapeshellarg('/home/vagrant/builds/helmo/drush_entity')
         . ' ' . escapeshellarg(getenv('HOME') . '/.drush/drush_entity'));
   }
 
