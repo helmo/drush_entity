@@ -10,5 +10,5 @@ before_script:
   - export PHPUNIT_ARGS=--bootstrap="${PWD}/../drush/tests/drush_testcase.inc"
   - cd tests
   - env
-script: phpunit $PHPUNIT_ARGS
+script: phpunit --debug $PHPUNIT_ARGS
 
