@@ -692,7 +692,9 @@ function _drush_entity_load($entity_type, $ids) {
         $entities[$id] = (object) $entity;
       }
       break;
-    case 7:
+    default:
+      // This should always be the latest API core version.
+      // For now both 7 and 8
       $entities = entity_load($entity_type, $ids);
       break;
   }
@@ -774,7 +776,7 @@ function _drush_entity_save($entity_type, &$entity, $new = FALSE) {
  * @return type
  */
 function _drush_entity_op($op, $entity_type, &$entity_or_id) {
-  // We need to fix for D7 when $op == delete
+  // TODO: We need to fix for D7 when $op == delete
   $op_alias = $op;
   if ($op == 'delete') {
     // D7 operator rename ..
