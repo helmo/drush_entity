@@ -256,25 +256,11 @@ function drush_entity_type_read($entity_types = NULL) {
 
   // List the available types
   if (!count($entity_types)) {
-    // Only provide choices if --fields option hasn't been populated.
-    if (!count($fields)) {
-      $options = array('types' => dt("Types only"), 'all' => dt("All info"));
-      if ($choice = drush_choice($options, 'Which entity information would you like to display?', '!value')) {
-        switch ($choice) {
-          case 'types':
-            $result = array_keys($entities_info);
-            $header = dt("Available entity types:\n");
-            drush_print(drush_format($result, $header, $format));
-            return;
-          case 'all':
-          default:
-            // Set the types to all, from entity info keys.
-            $types = array_keys($entities_info);
-        }
-      }
-      else {
-        return;
-      }
+    if (!$fields) {
+      $result = array_keys($entities_info);
+      $header = dt("Available entity types:\n");
+      drush_print(drush_format($result, $header, $format));
+      return;
     }
     else {
       $types = array_keys($entities_info);
