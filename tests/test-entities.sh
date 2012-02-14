@@ -49,7 +49,15 @@ log "Next command contains same info needed for drush el"
 drush etr `drush etr` --fields="bundles/*/label,label,base table,revision table,fieldable,entity class,controller class,drush/count" >> $OUTPUT
 stamp
 
-log "Reading nodes info."
+log "Read all entity type info"
+drush entity-type-read `drush entity-type-read` >> $OUTPUT
+stamp
+
+log "Read all entity label and base tables as json"
+drush entity-type-read --fields="label,base table" --format=json `drush entity-type-read --fields="label,base table" --format=json` >> $OUTPUT
+stamp
+
+log "Reading node type info."
 drush entity-type-read node `drush entity-type-read node` >> $OUTPUT
 stamp
 
