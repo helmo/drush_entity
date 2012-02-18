@@ -449,11 +449,11 @@ function _drush_entity_id_list($entity_type, $bundles = NULL, $print = TRUE) {
       // Will only be set if there are results.
       $drush_format = drush_get_option('format');
       $format = $drush_format ? $drush_format : DRUSH_ENTITY_SEPARATED_SPACE;
-      $header = $bundles ? dt("\nAvailable $bundle_list ids for $entity_type\n") : dt("\nAvailable ids for $entity_type\n");
+      $header = $bundles ? dt("Available $bundle_list ids for $entity_type") : dt("Available ids for $entity_type");
     }
     else {
       $format = DRUSH_ENTITY_SEPARATED_SPACE;
-      $header = $bundles ? dt("\nNo $bundle_list entities found for $entity_type\n") : dt("\nNo ids for $entity_type");
+      $header = $bundles ? dt("No $bundle_list entities found for $entity_type") : dt("No ids for $entity_type");
       $result = array();
     }
     _drush_entity_print($result, $format, $header);
@@ -750,7 +750,7 @@ function drush_entity_delete($entity_type = NULL, $ids = NULL) {
   if (!empty($ids)) {
     $result = _drush_entity_delete($entity_type, $ids);
     if (count($result) > 0) {
-      $header = dt("\nDeleted $entity_type entities:");
+      $header = dt("Deleted $entity_type entities:");
       _drush_entity_print($result, DRUSH_ENTITY_SEPARATED_SPACE, $header);
     }
   }
