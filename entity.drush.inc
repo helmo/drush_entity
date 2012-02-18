@@ -415,6 +415,7 @@ function _drush_entity_filter_fields(array $value, array $paths, array $delete_p
 function _drush_entity_id_list($entity_type, $bundles = NULL, $print = TRUE) {
   $entity_info = _drush_entity_get_info($entity_type);
   $bundle_list = '';
+  $result = array();
 
   if (drush_drupal_major_version() < 7) {
     if (isset($entity_info['load list sql'])) {
@@ -439,10 +440,13 @@ function _drush_entity_id_list($entity_type, $bundles = NULL, $print = TRUE) {
     $entities = $query->execute();
   }
 
+  if (isset($entities[$entity_type])) {
+    $result = array_keys($entities[$entity_type]);
+  }
+
   if ($print) {
-    // Will only be set if there are results.
-    if (isset($entities[$entity_type])) {
-      $result = array_keys($entities[$entity_type]);
+    if (!empty($result)) {
+      // Will only be set if there are results.
       $drush_format = drush_get_option('format');
       $format = $drush_format ? $drush_format : DRUSH_ENTITY_SEPARATED_SPACE;
       $header = $bundles ? dt("\nAvailable $bundle_list ids for $entity_type\n") : dt("\nAvailable ids for $entity_type\n");
@@ -726,7 +730,7 @@ function _drush_entity_load($entity_type, $ids) {
 }
 
 /**
- * Command callback.
+ * Entity delete command callback.
  */
 function drush_entity_delete($entity_type = NULL, $ids = NULL) {
   $ids = func_get_args();
@@ -751,7 +755,7 @@ function drush_entity_delete($entity_type = NULL, $ids = NULL) {
     }
   }
   else {
-    $ids = _drush_entity_id_list($entity_type, $bundles);
+    $ids = _drush_entity_id_list($entity_type, $bundles, FALSE);
     $bundle_list = $bundles ? implode(', ', $bundles) : NULL;
     if (!empty($ids) && drush_confirm(dt("Are you sure you want to delete all $entity_type $bundle_list entities?"))) {
       _drush_entity_delete($entity_type, $ids);
@@ -875,7 +879,7 @@ function _drush_entity_delete($entity_type, $ids = array()) {
   else {
     $result = array();
     foreach ($ids as $id) {
-      $result["$id"] = _drush_entity_op('delete', $entity_type, $id);
+      $result[$id] = _drush_entity_op('delete', $entity_type, $id);
     }
   }
   return array_keys($result);
