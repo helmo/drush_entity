@@ -14,12 +14,13 @@ FORMAT=properties
 function stamp {
   echo ============== >> $OUTPUT
   echo timestamp : `date` >> $OUTPUT
-  echo ============== >> $OUTPUT
 }
 
 function log {
   echo $1
-  echo == $1 == >> $OUTPUT
+  echo ============== >> $OUTPUT
+  echo $1 >> $OUTPUT
+  echo -------------- >> $OUTPUT
 }
 
 echo > $OUTPUT
@@ -27,6 +28,10 @@ stamp
 
 log "List of available entities."
 drush --format=$FORMAT entity-type-read >> $OUTPUT
+stamp
+
+log "List of available entities with json."
+drush --format=json entity-type-read >> $OUTPUT
 stamp
 
 log "Reading all entity types information."
