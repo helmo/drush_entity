@@ -56,6 +56,10 @@ echo Creating 20 nodes
 drush genc 20
 
 stamp
+echo Read all nodes of type page
+drush entity-read node --bundles=page
+
+stamp
 echo Delete all nodes of type page
 drush entity-delete node --bundles=page --yes
 

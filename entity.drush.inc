@@ -252,13 +252,13 @@ function drush_entity_type_read($entity_types = NULL) {
   $types = func_get_args();
   $entities_info = _drush_entity_get_info();
   $fields = _drush_entity_get_fields();
-  $format = drush_get_option('format', 'properties');
+  $format = drush_get_option('format', 'export');
 
   // List the available types
   if (!count($entity_types)) {
     if (!$fields) {
       $result = array_keys($entities_info);
-      $header = dt("Available entity types:\n");
+      $header = dt("Available entity types:");
       drush_print(drush_format($result, $header, $format));
       return;
     }
@@ -270,10 +270,12 @@ function drush_entity_type_read($entity_types = NULL) {
   $result = array();
   if (count($types)) {
     foreach ($types as $type) {
-      $info = $entities_info[$type];
-      $result_type = _drush_entity_filter_fields($info, $fields, _drush_entity_get_exclude_fields());
-      if (!empty($result_type)) {
-        $result[$type] = $result_type;
+      if (isset($entities_info[$type])) {
+        $info = $entities_info[$type];
+        $result_type = _drush_entity_filter_fields($info, $fields, _drush_entity_get_exclude_fields());
+        if (!empty($result_type)) {
+          $result[$type] = $result_type;
+        }
       }
     }
   }
@@ -300,7 +302,7 @@ function drush_entity_type_read($entity_types = NULL) {
  * @return array
  *   The matching path
  */
-function _drush_entity_filter_fields(array $value, array $paths, array $delete_path = array()) {
+function _drush_entity_filter_fields($value = array(), array $paths, array $delete_path = array()) {
   // Store object hashs to prevent object ref recursion
   $object_hash_list = array();
   $return = array();
@@ -453,7 +455,7 @@ function _drush_entity_id_list($entity_type, $bundles = NULL, $print = TRUE) {
     }
     else {
       $format = DRUSH_ENTITY_SEPARATED_SPACE;
-      $header = $bundles ? dt("No $bundle_list entities found for $entity_type") : dt("No ids for $entity_type");
+      $header = $bundles ? dt("No $bundle_list entities found for $entity_type") : dt("No ids found for $entity_type");
       $result = array();
     }
     _drush_entity_print($result, $format, $header);
@@ -1087,7 +1089,7 @@ function _drush_entity_print($object, $format = NULL, $header = '') {
     if ($header) {
       drush_print($header);
     }
-    drush_print(implode(" ", (array) $object) . "\n");
+    drush_print(implode(" ", (array) $object));
   }
   else {
     // Send it through drush_format.
