@@ -74,10 +74,6 @@ log "Reading users info."
 drush entity-type-read user `drush entity-type-read user` >> $OUTPUT
 stamp
 
-log "Reading node ids."
-drush entity-read node >> $OUTPUT
-stamp
-
 log "Reading files info."
 drush entity-read file `drush entity-read file` >> $OUTPUT
 stamp
