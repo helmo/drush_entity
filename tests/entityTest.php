@@ -14,6 +14,12 @@ class EntityTestCase extends Drush_CommandTestCase {
         . ' ' . escapeshellarg(getenv('HOME') . '/.drush/drush_entity'));
   }
 
+  public static function tearDownAfterClass() {
+    // Do our own cleanup - symlink from setUpBeforeClass()
+    unlink(getenv('HOME') . '/.drush/drush_entity');
+    parent::tearDownAfterClass();
+  }
+
   /*
    * Test entity support for Node entities
    *
