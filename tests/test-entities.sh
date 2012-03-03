@@ -59,11 +59,11 @@ drush entity-type-read `drush entity-type-read` >> $OUTPUT
 stamp
 
 log "Read all entity label and base tables as json"
-drush entity-type-read --fields="label,base table" --format=json `drush entity-type-read --fields="label,base table" --format=json` >> $OUTPUT
+drush entity-type-read --fields="label,base table" --format=json `drush entity-type-read` >> $OUTPUT
 stamp
 
 log "Reading node type info."
-drush entity-type-read node `drush entity-type-read node` >> $OUTPUT
+drush entity-type-read node >> $OUTPUT
 stamp
 
 log "Reading node ids."
@@ -71,15 +71,11 @@ drush entity-read node >> $OUTPUT
 stamp
 
 log "Reading users info."
-drush entity-type-read user `drush entity-type-read user` >> $OUTPUT
-stamp
-
-log "Reading node ids."
-drush entity-read node >> $OUTPUT
+drush entity-type-read user >> $OUTPUT
 stamp
 
 log "Reading files info."
-drush entity-read file `drush entity-read file` >> $OUTPUT
+drush entity-read file >> $OUTPUT
 stamp
 
 less $OUTPUT
