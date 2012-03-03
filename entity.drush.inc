@@ -143,7 +143,6 @@ function entity_drush_command() {
  *   A string with the help text for your command.
  */
 function entity_drush_help($section) {
-  // TODO: is this function still needed?
   switch ($section) {
     case 'drush:entity-show':
       return dt("Print entity objects to stdout");
@@ -252,14 +251,14 @@ function drush_entity_type_read($entity_types = NULL) {
   $types = func_get_args();
   $entities_info = _drush_entity_get_info();
   $fields = _drush_entity_get_fields();
-  $format = drush_get_option('format', 'export');
+  $format = drush_get_option('format', 'print_r');
 
   // List the available types
   if (!count($entity_types)) {
     if (!$fields) {
       $result = array_keys($entities_info);
-      $header = dt("Available entity types:");
-      drush_print(drush_format($result, $header, $format));
+      //$header = dt("Available entity types:");
+      drush_print(drush_format($result, NULL, $format));
       return;
     }
     else {
@@ -451,14 +450,14 @@ function _drush_entity_id_list($entity_type, $bundles = NULL, $print = TRUE) {
       // Will only be set if there are results.
       $drush_format = drush_get_option('format');
       $format = $drush_format ? $drush_format : DRUSH_ENTITY_SEPARATED_SPACE;
-      $header = $bundles ? dt("Available $bundle_list ids for $entity_type") : dt("Available ids for $entity_type");
+      //$header = $bundles ? dt("Available $bundle_list ids for $entity_type") : dt("Available ids for $entity_type");
     }
     else {
       $format = DRUSH_ENTITY_SEPARATED_SPACE;
       $header = $bundles ? dt("No $bundle_list entities found for $entity_type") : dt("No ids found for $entity_type");
       $result = array();
     }
-    _drush_entity_print($result, $format, $header);
+    _drush_entity_print($result, $format);
   }
 
   return $result;
@@ -472,7 +471,7 @@ function _drush_entity_id_list($entity_type, $bundles = NULL, $print = TRUE) {
  */
 function drush_entity_read($entity_type = NULL) {
   if (!$entity_type) {
-    drush_set_error('DRUSH_ERROR', dt("You must specify an entity_type"));
+    drush_set_error('DRUSH_ENTITY_ERROR', dt("You must specify an entity_type"));
     return;
   }
   $ids = func_get_args();
@@ -499,8 +498,14 @@ function drush_entity_read($entity_type = NULL) {
     $entities = array_shift($entities);
   }
 
-  drush_print_pipe(drush_format($entities));
-  drush_print(drush_format($entities));
+	if ($entities) {
+		drush_print_pipe(drush_format($entities));
+		drush_print(drush_format($entities));
+	}
+	else {
+		$ids = implode(',', $ids); // This could be drush format too.
+		drush_set_error('DRUSH_ENTITY_READ_ERROR', dt("No entities returned for IDs: $ids."));
+	}
 }
 
 /**
@@ -514,10 +519,10 @@ function _drush_entity_select_fields($entities, $fields, $allow_path = FALSE) {
   if (!$allow_path) {
     foreach ($fields as $path) {
       if (strpos($path, '/') !== FALSE) {
-        drush_set_error('DRUSH_ERROR', dt("No path supported yet : $path"));
+        drush_set_error('DRUSH_ENTITY_FIELD_ERROR', dt("No path supported yet : $path"));
       }
       if (strpos($path, '*') !== FALSE) {
-        drush_set_error('DRUSH_ERROR', dt("No wildcard supported yet : $path"));
+        drush_set_error('DRUSH_ENTITY_FIELD_ERROR', dt("No wildcard supported yet : $path"));
       }
     }
   }
@@ -547,8 +552,6 @@ function drush_entity_create($entity_type = NULL, $arg = NULL) {
 
   _drush_entity_check_type($entity_type);
 
-  $entity_info = _drush_entity_get_info($entity_type);
-
   if (empty($arg)) {
     $entity_class = isset($entity_info['entity class']) ? $entity_info['entity class'] : 'stdClass';
     $entity = new $entity_class();
@@ -573,25 +576,46 @@ function drush_entity_create($entity_type = NULL, $arg = NULL) {
   }
 
   if (!empty($entity_json)) {
-    $entity = (object) drush_json_decode($entity_json);
+    $entities = drush_json_decode($entity_json);
+		if (is_array($entities)) {
+			foreach ($entities as $entity_array) {
+				$entity = (object) $entity_array;
+				_drush_entity_create_entity($entity_type, $entity);
+			}
+		}
+		else {
+			$entity = $entities;
+			_drush_entity_create_entity($entity_type, $entity);
+		}
+  }
+	else if ($arg === '-') {
+		drush_set_error('DRUSH_NO_STDIN', dt("stdin empty!"));
+	}
+	else {
+		drush_set_error('DRUSH_EMPTY_FILE', dt("Empty file!"));
+	}
+}
 
-    $eid = $entity_info['drush']['new'][0];
-    if (_drush_entity_save($entity_type, $entity, TRUE)) {
-      _drush_entity_print('', DRUSH_ENTITY_SEPARATED_SPACE, 'Entity created.');
-    }
-    else if (isset($entity->$eid)) {
-      _drush_entity_print(array($entity->$eid), DRUSH_ENTITY_SEPARATED_SPACE, 'Entity created.');
-    }
-    else {
-      drush_set_error('DRUSH_ERROR', dt("Failed to create entity!"));
-    }
-  }
-  else if ($arg === '-') {
-    drush_set_error('DRUSH_NO_STDIN', dt("stdin empty!"));
-  }
-  else {
-    drush_set_error('DRUSH_EMPTY_FILE', dt("Empty file!"));
-  }
+/**
+ * Helper function to create entities.
+ *
+ * @param $entity_type
+ * @param $entity
+ *
+ */
+function _drush_entity_create_entity($entity_type, $entity) {
+	$entity_info = _drush_entity_get_info($entity_type);
+	$eid = $entity_info['drush']['new'][0];
+
+	if (_drush_entity_save($entity_type, $entity, TRUE)) {
+		_drush_entity_print('', DRUSH_ENTITY_SEPARATED_SPACE, 'Entity created.');
+	}
+	elseif (isset($entity->$eid)) {
+		_drush_entity_print(array($entity->$eid), DRUSH_ENTITY_SEPARATED_SPACE, 'Entity created.');
+	}
+	else {
+		drush_set_error('DRUSH_ERROR', dt("Failed to create entity!"));
+	}
 }
 
 /**
@@ -701,7 +725,7 @@ function drush_entity_update($entity_type, $id) {
     _drush_entity_save($entity_type, $edited_entity);
   }
   else {
-    drush_set_error('DRUSH_ERROR', dt("Entity to update not found!"));
+    drush_set_error('DRUSH_ENTITY_ERROR', dt("Entity to update not found!"));
   }
 }
 
@@ -830,7 +854,7 @@ function _drush_entity_op($op, $entity_type, &$entity_or_id) {
         break;
       case 'entity':
         $old = $entity_or_id;
-        $entity_or_id = reset(_drush_entity_load($entity_type, array($entity_or_id)));
+        $entity_or_id = _drush_entity_load($entity_type, array($entity_or_id));
         if (empty($entity_or_id)) {
           drush_log("Unable to run $op on $entity_type : $old", 'warning');
           return;
@@ -861,7 +885,7 @@ function _drush_entity_op($op, $entity_type, &$entity_or_id) {
     }
   }
   else {
-    drush_log("Unable to $op the entity $entity_or_id. Maybe you could try to install and enable the entity.module");
+    drush_log("Unable to $op the entity $entity_type. Maybe you could try to install and enable the entity.module");
     return FALSE;
   }
 }
